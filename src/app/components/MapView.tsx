@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router";
-import { MapPin, Navigation, Star, Clock } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Navigation, Star, MapPin, ZoomIn, ZoomOut, Maximize2, Layers } from "lucide-react";
 import { Button } from "./ui/button";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -9,13 +8,13 @@ interface Turf {
   id: number;
   name: string;
   location: string;
-  distance: number;
+  distance?: number;
   image: string;
   price: number;
-  rating: number;
-  isOpen: boolean;
-  lat: number;
-  lng: number;
+  rating?: number;
+  isOpen?: boolean;
+  lat?: number;
+  lng?: number;
   sports: string[];
 }
 
@@ -26,200 +25,219 @@ interface MapViewProps {
 export function MapView({ turfs }: MapViewProps) {
   const [hoveredTurf, setHoveredTurf] = useState<number | null>(null);
   const [selectedTurf, setSelectedTurf] = useState<number | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
+  const [mapType, setMapType] = useState<"street" | "satellite">("street");
+  const mapDivRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersRef = useRef<Map<number, L.Marker>>(new Map());
 
-  // Custom green marker icon
-  const greenIcon = L.icon({
-    iconUrl: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUiIGhlaWdodD0iNDEiIHZpZXdCb3g9IjAgMCAyNSA0MSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIuNSAwQzUuNjA2IDAgMCA1LjYwNiAwIDEyLjVjMCAxMC40MzggMTIuNSAyOC41IDEyLjUgMjguNVMyNSAyMi45MzggMjUgMTIuNUMyNSA1LjYwNiAxOS4zOTQgMCAxMi41IDB6IiBmaWxsPSIjMDBFNjc2IiBmaWxsLXJ1bGU9ImV2ZW5vZGQiLz48Y2lyY2xlIGN4PSIxMi41IiBjeT0iMTIuNSIgcj0iNSIgZmlsbD0iIzEyMTIxMiIvPjwvc3ZnPg==",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-  });
+  const initMap = useCallback(() => {
+    if (!mapDivRef.current || turfs.length === 0) return;
 
-  const highlightedIcon = L.icon({
-    iconUrl: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iNDkiIHZpZXdCb3g9IjAgMCAzMCA0OSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48ZmlsdGVyIGlkPSJnbG93Ij48ZmVHYXVzc2lhbkJsdXIgc3RkRGV2aWF0aW9uPSIyIiByZXN1bHQ9ImNvbG9yZWRCbHVyIi8+PGZlTWVyZ2U+PGZlTWVyZ2VOb2RlIGluPSJjb2xvcmVkQmx1ciIvPjxmZU1lcmdlTm9kZSBpbj0iU291cmNlR3JhcGhpYyIvPjwvZmVNZXJnZT48L2ZpbHRlcj48L2RlZnM+PHBhdGggZD0iTTE1IDNDNy44MiAzIDIgOC44MiAyIDE2YzAgMTIuNTI1IDEzIDI5LjUgMTMgMjkuNVMyOCAyOC41MjUgMjggMTZjMC03LjE4LTUuODItMTMtMTMtMTN6IiBmaWxsPSIjMDBFNjc2IiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGZpbHRlcj0idXJsKCNnbG93KSIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iMTYiIHI9IjYiIGZpbGw9IiMxMjEyMTIiLz48L3N2Zz4=",
-    iconSize: [30, 49],
-    iconAnchor: [15, 49],
-    popupAnchor: [1, -40],
-  });
+    const validTurf = turfs.find((t) => t.lat && t.lng);
+    const centerLat = validTurf?.lat ?? 19.1368;
+    const centerLng = validTurf?.lng ?? 72.8299;
 
-  useEffect(() => {
-    // Cleanup previous map
-    if (mapRef.current) {
-      mapRef.current.remove();
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
       markersRef.current.clear();
     }
 
-    if (!turfs.length) return;
-
-    // Initialize map
-    const map = L.map("map", {
-      center: [turfs[0].lat, turfs[0].lng],
+    const map = L.map(mapDivRef.current, {
+      center: [centerLat, centerLng],
       zoom: 13,
-      zoomControl: false, // We'll use custom controls
+      zoomControl: false,
+      scrollWheelZoom: true,
     });
 
-    // Add tile layer
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    const streetLayerUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    const satelliteLayerUrl =
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
-    // Add markers for each turf
+    const initialLayer = L.tileLayer(
+      mapType === "satellite" ? satelliteLayerUrl : streetLayerUrl,
+      {
+        attribution:
+          mapType === "satellite"
+            ? '&copy; <a href="https://www.esri.com/" target="_blank">Esri World Imagery</a>'
+            : '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }
+    ).addTo(map);
+
+    tileLayerRef.current = initialLayer;
+    mapInstanceRef.current = map;
+
+    // Add markers for all turfs
     turfs.forEach((turf) => {
-      const marker = L.marker([turf.lat, turf.lng], { 
-        icon: greenIcon 
-      }).addTo(map);
+      if (!turf.lat || !turf.lng) return;
 
-      // Create popup content
-      const popupContent = `
-        <div style="min-width: 200px; font-family: system-ui;">
-          <h4 style="color: #ffffff; font-weight: 600; font-size: 14px; margin-bottom: 4px;">
-            ${turf.name}
-          </h4>
-          <p style="color: #BDBDBD; font-size: 12px; margin-bottom: 8px;">
-            ${turf.location}
-          </p>
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <span style="color: #00E676; font-weight: bold; font-size: 14px;">
-              ₹${turf.price}/hr
-            </span>
-            <a href="/turf/${turf.id}" style="display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 500; background: #00E676; color: #121212; text-decoration: none;">
-              View
-            </a>
+      const isOpen = turf.isOpen ?? true;
+      const color = isOpen ? "#00E676" : "#FF6B6B";
+
+      const customDivIcon = L.divIcon({
+        className: "turf-map-marker",
+        html: `
+          <div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;filter:drop-shadow(0 3px 8px ${
+            isOpen ? "rgba(0,230,118,0.6)" : "rgba(255,107,107,0.6)"
+          });">
+            <div style="
+              background:${color};color:#121212;font-weight:700;font-size:11px;
+              padding:3px 8px;border-radius:6px;white-space:nowrap;
+              border:2px solid #121212;margin-bottom:2px;
+            ">₹${turf.price}/hr</div>
+            <svg width="24" height="30" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11 0C4.925 0 0 4.925 0 11C0 19.25 11 28 11 28C11 28 22 19.25 22 11C22 4.925 17.075 0 11 0Z" fill="${color}"/>
+              <circle cx="11" cy="11" r="4.5" fill="#121212"/>
+              <circle cx="11" cy="11" r="2" fill="${color}"/>
+            </svg>
+          </div>
+        `,
+        iconSize: [60, 52],
+        iconAnchor: [30, 50],
+        popupAnchor: [0, -48],
+      });
+
+      const marker = L.marker([turf.lat, turf.lng], { icon: customDivIcon }).addTo(map);
+
+      const popupHtml = `
+        <div style="background:#1E1E1E;border-radius:12px;padding:12px;min-width:210px;font-family:system-ui;border:1px solid #1B5E20;color:#fff;">
+          <h4 style="color:#fff;font-weight:700;font-size:14px;margin:0 0 4px">${turf.name}</h4>
+          <p style="color:#BDBDBD;font-size:11px;margin:0 0 8px;line-height:1.3">${turf.location}</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+            <span style="color:#00E676;font-weight:700;font-size:14px">₹${turf.price}/hr</span>
+            <a href="/turf/${turf.id}" style="background:#00E676;color:#121212;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;text-decoration:none;">View Arena</a>
           </div>
         </div>
       `;
 
-      marker.bindPopup(popupContent, {
-        className: 'custom-popup',
+      marker.bindPopup(popupHtml, {
+        className: "turf-popup-custom",
         closeButton: true,
-      });
-
-      // Store marker reference
-      markersRef.current.set(turf.id, marker);
-
-      // Marker interactions
-      marker.on("mouseover", () => {
-        setHoveredTurf(turf.id);
-        marker.setIcon(highlightedIcon);
-      });
-
-      marker.on("mouseout", () => {
-        if (selectedTurf !== turf.id) {
-          setHoveredTurf(null);
-          marker.setIcon(greenIcon);
-        }
       });
 
       marker.on("click", () => {
         setSelectedTurf(turf.id);
-        marker.openPopup();
       });
+
+      markersRef.current.set(turf.id, marker);
     });
 
-    mapRef.current = map;
+    const validCoords = turfs
+      .filter((t) => t.lat && t.lng)
+      .map((t) => [t.lat!, t.lng!] as [number, number]);
 
-    // Cleanup function
+    if (validCoords.length > 0) {
+      const bounds = L.latLngBounds(validCoords);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [turfs, mapType]);
+
+  useEffect(() => {
+    initMap();
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markersRef.current.clear();
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
       }
     };
-  }, [turfs]);
+  }, [initMap]);
 
-  // Update markers when hoveredTurf or selectedTurf changes
-  useEffect(() => {
-    markersRef.current.forEach((marker, turfId) => {
-      if (turfId === hoveredTurf || turfId === selectedTurf) {
-        marker.setIcon(highlightedIcon);
-      } else {
-        marker.setIcon(greenIcon);
-      }
-    });
-  }, [hoveredTurf, selectedTurf]);
+  const toggleLayer = () => {
+    const nextType = mapType === "street" ? "satellite" : "street";
+    setMapType(nextType);
+  };
+
+  const panToTurf = (turf: Turf) => {
+    if (!turf.lat || !turf.lng || !mapInstanceRef.current) return;
+    setSelectedTurf(turf.id);
+    mapInstanceRef.current.flyTo([turf.lat, turf.lng], 15, { duration: 1.2 });
+    const marker = markersRef.current.get(turf.id);
+    if (marker) {
+      marker.openPopup();
+    }
+  };
+
+  const handleFitAll = () => {
+    if (!mapInstanceRef.current || turfs.length === 0) return;
+    const validCoords = turfs
+      .filter((t) => t.lat && t.lng)
+      .map((t) => [t.lat!, t.lng!] as [number, number]);
+    if (validCoords.length > 0) {
+      const bounds = L.latLngBounds(validCoords);
+      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+    }
+  };
 
   return (
-    <div className="bg-[#1E1E1E] rounded-[14px] overflow-hidden card-elevation h-[calc(100vh-300px)]">
+    <div className="bg-[#1E1E1E] rounded-[14px] overflow-hidden card-elevation h-[calc(100vh-300px)] border border-[#1B5E20]/40">
       <div className="flex h-full">
-        {/* Left Panel - Turf List */}
-        <div className="w-96 bg-[#121212] border-r border-[#1B5E20] overflow-y-auto">
-          <div className="p-4 border-b border-[#1B5E20] sticky top-0 bg-[#121212] z-10">
-            <h3 className="text-white font-semibold text-lg">
-              {turfs.length} Turfs Found
-            </h3>
+        {/* Left panel — turf list */}
+        <div className="w-80 bg-[#121212] border-r border-[#1B5E20]/50 overflow-y-auto flex-shrink-0">
+          <div className="p-4 border-b border-[#1B5E20]/50 sticky top-0 bg-[#121212] z-10">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-semibold text-base flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#00E676]" />
+                {turfs.length} Turfs Found
+              </h3>
+              <span className="text-[11px] bg-[#00E676]/10 text-[#00E676] px-2 py-0.5 rounded-full font-medium">
+                Live Map
+              </span>
+            </div>
+            <p className="text-[#BDBDBD] text-xs mt-1">Click a venue to focus on the map</p>
           </div>
-
-          <div className="p-4 space-y-3">
+          <div className="p-3 space-y-3">
             {turfs.map((turf) => (
               <div
                 key={turf.id}
                 onMouseEnter={() => setHoveredTurf(turf.id)}
                 onMouseLeave={() => setHoveredTurf(null)}
-                onClick={() => {
-                  setSelectedTurf(turf.id);
-                  // Center map on selected turf
-                  if (mapRef.current) {
-                    mapRef.current.setView([turf.lat, turf.lng], 15, {
-                      animate: true,
-                      duration: 0.5,
-                    });
-                    // Open the marker popup
-                    const marker = markersRef.current.get(turf.id);
-                    if (marker) {
-                      marker.openPopup();
-                    }
-                  }
-                }}
-                className={`bg-[#1E1E1E] rounded-[14px] p-3 cursor-pointer transition-all border ${
+                onClick={() => panToTurf(turf)}
+                className={`bg-[#1E1E1E] rounded-xl p-3 cursor-pointer transition-all border ${
                   hoveredTurf === turf.id || selectedTurf === turf.id
-                    ? "border-[#00E676] neon-glow"
-                    : "border-[#1B5E20]"
+                    ? "border-[#00E676] shadow-[0_0_12px_rgba(0,230,118,0.25)] translate-x-0.5"
+                    : "border-[#1B5E20]/40 hover:border-[#1B5E20]"
                 }`}
               >
                 <div className="flex gap-3">
                   <img
                     src={turf.image}
                     alt={turf.name}
-                    className="w-20 h-20 rounded-lg object-cover"
+                    className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <h4 className="text-white font-semibold text-sm truncate">
+                    <div className="flex items-start justify-between gap-1 mb-1">
+                      <h4 className="text-white font-semibold text-xs leading-tight truncate">
                         {turf.name}
                       </h4>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${
-                          turf.isOpen
+                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap flex-shrink-0 ${
+                          turf.isOpen ?? true
                             ? "bg-[#00E676]/20 text-[#00E676]"
-                            : "bg-red-500/20 text-red-500"
+                            : "bg-red-500/20 text-red-400"
                         }`}
                       >
-                        {turf.isOpen ? "Open" : "Closed"}
+                        {turf.isOpen ?? true ? "Open" : "Closed"}
                       </span>
                     </div>
-
-                    <p className="text-[#BDBDBD] text-xs mb-2 truncate">
-                      {turf.location}
-                    </p>
-
+                    <p className="text-[#BDBDBD] text-[11px] mb-1.5 truncate">{turf.location}</p>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-xs">
-                        <div className="flex items-center gap-1 text-[#BDBDBD]">
-                          <Navigation className="h-3 w-3 text-[#00E676]" />
-                          <span>{turf.distance} km</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[#BDBDBD]">
-                          <Star className="h-3 w-3 text-[#00E676] fill-[#00E676]" />
-                          <span>{turf.rating}</span>
-                        </div>
+                      <div className="flex items-center gap-2 text-[11px] text-[#BDBDBD]">
+                        {turf.distance !== undefined && (
+                          <span className="flex items-center gap-0.5">
+                            <Navigation className="h-3 w-3 text-[#00E676]" />
+                            {turf.distance} km
+                          </span>
+                        )}
+                        {turf.rating !== undefined && (
+                          <span className="flex items-center gap-0.5">
+                            <Star className="h-3 w-3 text-[#00E676] fill-[#00E676]" />
+                            {turf.rating}
+                          </span>
+                        )}
                       </div>
-                      <span className="text-[#00E676] font-bold text-sm">
-                        ₹{turf.price}/hr
-                      </span>
+                      <span className="text-[#00E676] font-bold text-xs">₹{turf.price}/hr</span>
                     </div>
                   </div>
                 </div>
@@ -228,37 +246,64 @@ export function MapView({ turfs }: MapViewProps) {
           </div>
         </div>
 
-        {/* Right Panel - Map */}
-        <div className="flex-1 relative bg-[#1a1a1a]">
-          {/* Leaflet Map Container */}
-          <div
-            id="map"
-            className="absolute inset-0 w-full h-full z-0"
-            style={{ background: '#1a1a1a' }}
-          />
+        {/* Right panel — OpenStreetMap & Satellite Map */}
+        <div className="flex-1 relative">
+          <div ref={mapDivRef} className="absolute inset-0 w-full h-full" />
 
-          {/* Zoom Controls */}
-          <div className="absolute right-4 top-4 flex flex-col gap-2 z-[1000]">
+          {/* Map Controls */}
+          <div className="absolute right-4 top-4 flex flex-col gap-2 z-[400]">
             <Button
               size="icon"
-              onClick={() => mapRef.current?.zoomIn()}
-              className="bg-[#1E1E1E] hover:bg-[#1E1E1E]/90 text-white border border-[#1B5E20]"
+              onClick={() => mapInstanceRef.current?.zoomIn()}
+              className="bg-[#1E1E1E]/90 hover:bg-[#2a2a2a] text-white border border-[#1B5E20] w-9 h-9 shadow-lg backdrop-blur"
+              title="Zoom In"
             >
-              +
+              <ZoomIn className="w-4 h-4" />
             </Button>
             <Button
               size="icon"
-              onClick={() => mapRef.current?.zoomOut()}
-              className="bg-[#1E1E1E] hover:bg-[#1E1E1E]/90 text-white border border-[#1B5E20]"
+              onClick={() => mapInstanceRef.current?.zoomOut()}
+              className="bg-[#1E1E1E]/90 hover:bg-[#2a2a2a] text-white border border-[#1B5E20] w-9 h-9 shadow-lg backdrop-blur"
+              title="Zoom Out"
             >
-              −
+              <ZoomOut className="w-4 h-4" />
+            </Button>
+            <Button
+              size="icon"
+              onClick={toggleLayer}
+              className={`border border-[#1B5E20] w-9 h-9 shadow-lg backdrop-blur ${
+                mapType === "satellite"
+                  ? "bg-[#00E676] text-[#121212]"
+                  : "bg-[#1E1E1E]/90 text-white hover:bg-[#2a2a2a]"
+              }`}
+              title={mapType === "street" ? "Switch to Satellite View" : "Switch to Street View"}
+            >
+              <Layers className="w-4 h-4" />
+            </Button>
+            <Button
+              size="icon"
+              onClick={handleFitAll}
+              className="bg-[#1E1E1E]/90 hover:bg-[#2a2a2a] text-[#00E676] border border-[#1B5E20] w-9 h-9 shadow-lg backdrop-blur"
+              title="Fit All Turfs"
+            >
+              <Maximize2 className="w-4 h-4" />
             </Button>
           </div>
 
-          {/* Search This Area Button */}
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000]">
-            <Button className="bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover font-semibold shadow-lg">
-              Search This Area
+          {/* Layer and Fit all buttons bottom */}
+          <div className="absolute bottom-4 right-4 flex items-center gap-2 z-[400]">
+            <Button
+              onClick={toggleLayer}
+              variant="outline"
+              className="bg-[#1E1E1E]/90 border-[#1B5E20] text-xs text-white hover:text-[#00E676] h-auto py-1.5 px-3 backdrop-blur"
+            >
+              {mapType === "street" ? "🛰️ Satellite View" : "🗺️ Street Map"}
+            </Button>
+            <Button
+              onClick={handleFitAll}
+              className="bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 font-bold text-xs px-3.5 py-1.5 h-auto shadow-[0_4px_14px_rgba(0,230,118,0.35)]"
+            >
+              Fit All Venues
             </Button>
           </div>
         </div>

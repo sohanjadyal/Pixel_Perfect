@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import {
   Calendar,
   Clock,
@@ -7,6 +8,8 @@ import {
   Phone,
   X,
   LogOut,
+  Eye,
+  UserCheck,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -49,6 +52,8 @@ const mockMyRequests = [
       { name: "Rahul Kumar", phone: "+91 9876543210" },
       { name: "Amit Sharma", phone: "+91 9876543211" },
       { name: "Vikas Patel", phone: "+91 9876543212" },
+      { name: "Deepak Rao", phone: "+91 9876543219" },
+      { name: "Manoj Tiwari", phone: "+91 9876543220" },
     ],
   },
   {
@@ -63,6 +68,7 @@ const mockMyRequests = [
     players: [
       { name: "Sanjay Reddy", phone: "+91 9876543213" },
       { name: "Kiran Singh", phone: "+91 9876543214" },
+      { name: "Ajay Kumar", phone: "+91 9876543218" },
     ],
   },
 ];
@@ -80,6 +86,10 @@ const mockAvailableMatches = [
     joinedPlayers: 2,
     contributionPerPlayer: 100,
     hasJoined: false,
+    players: [
+      { name: "Arjun Mehta (Creator)", phone: "+91 9876543215" },
+      { name: "Sneha Desai", phone: "+91 9876543221" },
+    ],
   },
   {
     id: 4,
@@ -93,6 +103,19 @@ const mockAvailableMatches = [
     joinedPlayers: 11,
     contributionPerPlayer: 180,
     hasJoined: false,
+    players: [
+      { name: "Priya Gupta (Creator)", phone: "+91 9876543216" },
+      { name: "Rohit Sharma", phone: "+91 9876543222" },
+      { name: "Virat Kohli", phone: "+91 9876543223" },
+      { name: "MS Dhoni", phone: "+91 9876543224" },
+      { name: "KL Rahul", phone: "+91 9876543225" },
+      { name: "Hardik Pandya", phone: "+91 9876543226" },
+      { name: "Ravindra Jadeja", phone: "+91 9876543227" },
+      { name: "Jasprit Bumrah", phone: "+91 9876543228" },
+      { name: "Mohammed Shami", phone: "+91 9876543229" },
+      { name: "Yuzvendra Chahal", phone: "+91 9876543230" },
+      { name: "Shubman Gill", phone: "+91 9876543231" },
+    ],
   },
 ];
 
@@ -123,8 +146,14 @@ const mockJoinedMatches = [
 ];
 
 export function MatchSection() {
-  const [showCreateDialog, setShowCreateDialog] =
-    useState(false);
+  const isLoggedIn = !!localStorage.getItem("turfbook_auth");
+  const navigate = useNavigate();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<any>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState("available");
+  const [availableMatches, setAvailableMatches] = useState(mockAvailableMatches);
+  const [joinedMatches, setJoinedMatches] = useState(mockJoinedMatches);
   const [newMatch, setNewMatch] = useState({
     sport: "",
     date: "",
@@ -142,12 +171,67 @@ export function MatchSection() {
 
   const handleJoinMatch = (matchId: number) => {
     console.log("Joining match:", matchId);
-    // Handle joining match
+    
+    // Find the match in available matches
+    const matchToJoin = availableMatches.find(m => m.id === matchId);
+    
+    if (matchToJoin) {
+      // Add current user to the match
+      const updatedMatch = {
+        ...matchToJoin,
+        joinedPlayers: matchToJoin.joinedPlayers + 1,
+        hasJoined: true,
+        allPlayers: [
+          ...matchToJoin.players,
+          { name: "Me (You)", phone: "+91 9876543210" }
+        ]
+      };
+      
+      // Remove from available matches
+      setAvailableMatches(prev => prev.filter(m => m.id !== matchId));
+      
+      // Add to joined matches
+      setJoinedMatches(prev => [...prev, updatedMatch]);
+      
+      // Switch to joined tab
+      setActiveTab("joined");
+    }
+    
+    setShowDetailsDialog(false);
+  };
+
+  const handleViewDetails = (match: any) => {
+    setSelectedMatch(match);
+    setShowDetailsDialog(true);
   };
 
   const handleLeaveMatch = (matchId: number) => {
     console.log("Leaving match:", matchId);
-    // Handle leaving match
+    
+    // Find the match in joined matches
+    const matchToLeave = joinedMatches.find(m => m.id === matchId);
+    
+    if (matchToLeave) {
+      // Remove current user from the match
+      const updatedMatch = {
+        ...matchToLeave,
+        joinedPlayers: matchToLeave.joinedPlayers - 1,
+        hasJoined: false,
+        players: matchToLeave.allPlayers?.filter(p => p.name !== "Me (You)") || matchToLeave.players
+      };
+      
+      // Remove allPlayers property and keep only players
+      const { allPlayers, ...matchWithoutAllPlayers } = updatedMatch;
+      
+      // Remove from joined matches
+      setJoinedMatches(prev => prev.filter(m => m.id !== matchId));
+      
+      // Add back to available matches
+      setAvailableMatches(prev => [...prev, matchWithoutAllPlayers]);
+      
+      // Stay on joined tab
+      setActiveTab("joined");
+    }
   };
 
   const handleCancelMatch = (matchId: number) => {
@@ -156,15 +240,15 @@ export function MatchSection() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
               Matches
             </h1>
-            <p className="text-[#BDBDBD]">
+            <p className="text-sm sm:text-base text-[#BDBDBD]">
               Find players or create your own match
             </p>
           </div>
@@ -173,12 +257,22 @@ export function MatchSection() {
             open={showCreateDialog}
             onOpenChange={setShowCreateDialog}
           >
-            <DialogTrigger asChild>
-              <Button className="bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover">
+            {isLoggedIn ? (
+              <DialogTrigger asChild>
+                <Button className="bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover w-full sm:w-auto">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Match Request
+                </Button>
+              </DialogTrigger>
+            ) : (
+              <Button
+                onClick={() => navigate("/login")}
+                className="bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover w-full sm:w-auto"
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Match Request
               </Button>
-            </DialogTrigger>
+            )}
             <DialogContent className="bg-[#1E1E1E] border-[#1B5E20] max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-white text-2xl">
@@ -333,91 +427,104 @@ export function MatchSection() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="available" className="w-full">
-          <TabsList className="bg-[#FFFFFF] border border-[#1B5E20] mb-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="bg-[#FFFFFF] border border-[#1B5E20] mb-4 sm:mb-6 w-full sm:w-auto">
             <TabsTrigger
               value="available"
-              className="data-[state=active]:bg-[#00E676] data-[state=active]:text-[#121212]"
+              className="data-[state=active]:bg-[#00E676] data-[state=active]:text-[#121212] text-xs sm:text-sm"
             >
               Available Matches
             </TabsTrigger>
             <TabsTrigger
               value="my-requests"
-              className="data-[state=active]:bg-[#00E676] data-[state=active]:text-[#121212]"
+              className="data-[state=active]:bg-[#00E676] data-[state=active]:text-[#121212] text-xs sm:text-sm"
             >
               My Requests
             </TabsTrigger>
             <TabsTrigger
               value="joined"
-              className="data-[state=active]:bg-[#00E676] data-[state=active]:text-[#121212]"
+              className="data-[state=active]:bg-[#00E676] data-[state=active]:text-[#121212] text-xs sm:text-sm"
             >
               Joined Matches
             </TabsTrigger>
           </TabsList>
 
           {/* Available Matches */}
-          <TabsContent value="available" className="space-y-4">
-            {mockAvailableMatches.map((match) => (
+          <TabsContent value="available" className="space-y-3 sm:space-y-4">
+            {availableMatches.map((match) => (
               <div
                 key={match.id}
-                className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation hover:border-[#00E676] border-2 border-[#1B5E20] transition-all"
+                className="bg-[#1E1E1E] rounded-[14px] p-4 sm:p-6 card-elevation hover:border-[#00E676] border-2 border-[#1B5E20] transition-all"
               >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex-1 space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-white font-bold text-xl">
-                            {match.sport}
-                          </h3>
-                          <Badge className="bg-[#1B5E20] text-[#00E676] border border-[#00E676]">
-                            {match.requiredPlayers -
-                              match.joinedPlayers}{" "}
-                            Needed
-                          </Badge>
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2 flex-wrap">
+                            <h3 className="text-white font-bold text-lg sm:text-xl">
+                              {match.sport}
+                            </h3>
+                            <Badge className="bg-[#1B5E20] text-[#00E676] border border-[#00E676] text-xs">
+                              {match.requiredPlayers -
+                                match.joinedPlayers}{" "}
+                              Needed
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-[#BDBDBD]">
+                            By {match.creatorName}
+                          </p>
                         </div>
-                        <p className="text-[#BDBDBD]">
-                          By {match.creatorName}
-                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-[#00E676] flex-shrink-0" />
+                          <span className="text-white text-xs sm:text-sm truncate">
+                            {new Date(
+                              match.date,
+                            ).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-[#00E676] flex-shrink-0" />
+                          <span className="text-white text-xs sm:text-sm truncate">
+                            {match.timeSlots[0]}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-[#00E676] flex-shrink-0" />
+                          <span className="text-white text-xs sm:text-sm">
+                            {match.joinedPlayers}/
+                            {match.totalPlayers}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#00E676] font-bold text-sm sm:text-base">
+                            ₹{match.contributionPerPlayer}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-[#00E676]" />
-                        <span className="text-white text-sm">
-                          {new Date(
-                            match.date,
-                          ).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-[#00E676]" />
-                        <span className="text-white text-sm">
-                          {match.timeSlots[0]}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-[#00E676]" />
-                        <span className="text-white text-sm">
-                          {match.joinedPlayers}/
-                          {match.totalPlayers}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#00E676] font-bold">
-                          ₹{match.contributionPerPlayer}
-                        </span>
-                      </div>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 lg:flex-col lg:w-auto">
+                      <Button
+                        onClick={() => handleViewDetails(match)}
+                        variant="outline"
+                        className="border-[#1B5E20] text-white hover:border-[#00E676] hover:text-[#00E676] w-full sm:flex-1 lg:w-auto text-sm text-[#000000]"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Details
+                      </Button>
+                      <Button
+                        onClick={() => handleJoinMatch(match.id)}
+                        className="bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover w-full sm:flex-1 lg:w-auto text-sm"
+                      >
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        Join Match
+                      </Button>
                     </div>
                   </div>
-
-                  <Button
-                    onClick={() => handleJoinMatch(match.id)}
-                    className="bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover"
-                  >
-                    Join Match
-                  </Button>
                 </div>
               </div>
             ))}
@@ -426,21 +533,32 @@ export function MatchSection() {
           {/* My Requests */}
           <TabsContent
             value="my-requests"
-            className="space-y-4"
+            className="space-y-3 sm:space-y-4"
           >
-            {mockMyRequests.map((match) => (
+            {!isLoggedIn ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-16 h-16 rounded-full bg-[#1B5E20]/20 border border-[#1B5E20] flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-[#00E676]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Login to see your requests</h3>
+                <p className="text-[#757575] text-sm mb-5">Sign in to create and manage your match requests</p>
+                <a href="/login" className="px-6 py-2.5 rounded-xl bg-[#00E676] text-[#121212] font-bold text-sm hover:bg-[#00E676]/90 shadow-[0_0_20px_rgba(0,230,118,0.25)] transition-all">
+                  Login / Sign Up
+                </a>
+              </div>
+            ) : mockMyRequests.map((match) => (
               <div
                 key={match.id}
-                className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation border-2 border-[#00E676]/30"
+                className="bg-[#1E1E1E] rounded-[14px] p-4 sm:p-6 card-elevation border-2 border-[#00E676]/30"
               >
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-white font-bold text-xl">
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2 flex-wrap">
+                        <h3 className="text-white font-bold text-lg sm:text-xl">
                           {match.sport}
                         </h3>
-                        <Badge className="bg-[#00E676]/20 text-[#00E676]">
+                        <Badge className="bg-[#00E676]/20 text-[#00E676] text-xs">
                           My Request
                         </Badge>
                       </div>
@@ -450,59 +568,63 @@ export function MatchSection() {
                         handleCancelMatch(match.id)
                       }
                       variant="outline"
-                      className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                      className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white w-full sm:w-auto text-sm"
                     >
                       <X className="w-4 h-4 mr-2" />
                       Cancel Match
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-[#00E676]" />
-                      <span className="text-white text-sm">
+                      <Calendar className="w-4 h-4 text-[#00E676] flex-shrink-0" />
+                      <span className="text-white text-xs sm:text-sm truncate">
                         {new Date(
                           match.date,
                         ).toLocaleDateString()}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-[#00E676]" />
-                      <span className="text-white text-sm">
-                        {match.timeSlots.join(", ")}
-                      </span>
+                    <div className="flex items-start gap-2">
+                      <Clock className="w-4 h-4 text-[#00E676] flex-shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-0.5">
+                        {match.timeSlots.map((slot: string, i: number) => (
+                          <span key={i} className="text-white text-xs sm:text-sm leading-tight">
+                            {slot}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-[#00E676]" />
-                      <span className="text-white text-sm">
+                      <Users className="w-4 h-4 text-[#00E676] flex-shrink-0" />
+                      <span className="text-white text-xs sm:text-sm">
                         {match.joinedPlayers}/
                         {match.totalPlayers}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[#00E676] font-bold">
+                      <span className="text-[#00E676] font-bold text-sm sm:text-base">
                         ₹{match.contributionPerPlayer}
                       </span>
                     </div>
                   </div>
 
                   {/* Joined Players List */}
-                  <div>
-                    <h4 className="text-white font-semibold mb-3">
+                  <div className="pt-2">
+                    <h4 className="text-white font-semibold mb-2 sm:mb-3 text-sm sm:text-base">
                       Joined Players ({match.joinedPlayers})
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
                       {match.players.map((player, index) => (
                         <div
                           key={index}
                           className="bg-[#121212] rounded-lg p-3 border border-[#1B5E20]"
                         >
-                          <p className="text-white font-medium">
+                          <p className="text-white font-medium text-sm">
                             {player.name}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
-                            <Phone className="w-3 h-3 text-[#00E676]" />
-                            <p className="text-[#BDBDBD] text-sm">
+                            <Phone className="w-3 h-3 text-[#00E676] flex-shrink-0" />
+                            <p className="text-[#BDBDBD] text-xs sm:text-sm truncate">
                               {player.phone}
                             </p>
                           </div>
@@ -516,83 +638,94 @@ export function MatchSection() {
           </TabsContent>
 
           {/* Joined Matches */}
-          <TabsContent value="joined" className="space-y-4">
-            {mockJoinedMatches.map((match) => (
+          <TabsContent value="joined" className="space-y-3 sm:space-y-4">
+            {!isLoggedIn ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-16 h-16 rounded-full bg-[#1B5E20]/20 border border-[#1B5E20] flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-[#00E676]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Login to see joined matches</h3>
+                <p className="text-[#757575] text-sm mb-5">Sign in to view and manage matches you have joined</p>
+                <a href="/login" className="px-6 py-2.5 rounded-xl bg-[#00E676] text-[#121212] font-bold text-sm hover:bg-[#00E676]/90 shadow-[0_0_20px_rgba(0,230,118,0.25)] transition-all">
+                  Login / Sign Up
+                </a>
+              </div>
+            ) : joinedMatches.map((match) => (
               <div
                 key={match.id}
-                className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation border-2 border-[#1B5E20]"
+                className="bg-[#1E1E1E] rounded-[14px] p-4 sm:p-6 card-elevation border-2 border-[#1B5E20]"
               >
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-white font-bold text-xl">
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2 flex-wrap">
+                        <h3 className="text-white font-bold text-lg sm:text-xl">
                           {match.sport}
                         </h3>
-                        <Badge className="bg-[#1B5E20] text-[#00E676]">
+                        <Badge className="bg-[#1B5E20] text-[#00E676] text-xs">
                           Joined
                         </Badge>
                       </div>
-                      <p className="text-[#BDBDBD]">
+                      <p className="text-sm text-[#BDBDBD]">
                         Created by {match.creatorName}
                       </p>
                     </div>
                     <Button
                       onClick={() => handleLeaveMatch(match.id)}
                       variant="outline"
-                      className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                      className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white w-full sm:w-auto text-sm"
                     >
                       <LogOut className="w-4 h-4 mr-2" />
                       Leave Match
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-[#00E676]" />
-                      <span className="text-white text-sm">
+                      <Calendar className="w-4 h-4 text-[#00E676] flex-shrink-0" />
+                      <span className="text-white text-xs sm:text-sm truncate">
                         {new Date(
                           match.date,
                         ).toLocaleDateString()}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-[#00E676]" />
-                      <span className="text-white text-sm">
+                      <Clock className="w-4 h-4 text-[#00E676] flex-shrink-0" />
+                      <span className="text-white text-xs sm:text-sm truncate">
                         {match.timeSlots.join(", ")}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-[#00E676]" />
-                      <span className="text-white text-sm">
+                      <Users className="w-4 h-4 text-[#00E676] flex-shrink-0" />
+                      <span className="text-white text-xs sm:text-sm">
                         {match.joinedPlayers}/
                         {match.totalPlayers}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[#00E676] font-bold">
+                      <span className="text-[#00E676] font-bold text-sm sm:text-base">
                         ₹{match.contributionPerPlayer}
                       </span>
                     </div>
                   </div>
 
                   {/* All Players List */}
-                  <div>
-                    <h4 className="text-white font-semibold mb-3">
+                  <div className="pt-2">
+                    <h4 className="text-white font-semibold mb-2 sm:mb-3 text-sm sm:text-base">
                       All Players ({match.allPlayers.length})
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
                       {match.allPlayers.map((player, index) => (
                         <div
                           key={index}
                           className="bg-[#121212] rounded-lg p-3 border border-[#1B5E20]"
                         >
-                          <p className="text-white font-medium">
+                          <p className="text-white font-medium text-sm">
                             {player.name}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
-                            <Phone className="w-3 h-3 text-[#00E676]" />
-                            <p className="text-[#BDBDBD] text-sm">
+                            <Phone className="w-3 h-3 text-[#00E676] flex-shrink-0" />
+                            <p className="text-[#BDBDBD] text-xs sm:text-sm truncate">
                               {player.phone}
                             </p>
                           </div>
@@ -605,6 +738,156 @@ export function MatchSection() {
             ))}
           </TabsContent>
         </Tabs>
+
+        {/* Match Details Dialog */}
+        <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+          <DialogContent className="bg-[#1E1E1E] border-[#1B5E20] max-w-3xl max-h-[90vh] overflow-y-auto">
+            {selectedMatch && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-white text-xl sm:text-2xl">
+                    {selectedMatch.sport} Match Details
+                  </DialogTitle>
+                  <DialogDescription className="text-[#BDBDBD] text-sm sm:text-base">
+                    View complete match information and players
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 sm:space-y-6 py-4">
+                  {/* Match Info */}
+                  <div className="bg-[#121212] rounded-xl p-4 sm:p-5 border border-[#1B5E20]">
+                    <h3 className="text-white font-bold mb-3 sm:mb-4 text-base sm:text-lg">Match Information</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#1B5E20] flex items-center justify-center flex-shrink-0">
+                          <Calendar className="w-5 h-5 text-[#00E676]" />
+                        </div>
+                        <div>
+                          <p className="text-[#BDBDBD] text-xs sm:text-sm">Date</p>
+                          <p className="text-white font-semibold text-sm sm:text-base">
+                            {new Date(selectedMatch.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#1B5E20] flex items-center justify-center flex-shrink-0">
+                          <Clock className="w-5 h-5 text-[#00E676]" />
+                        </div>
+                        <div>
+                          <p className="text-[#BDBDBD] text-xs sm:text-sm">Time</p>
+                          <p className="text-white font-semibold text-sm sm:text-base">
+                            {selectedMatch.timeSlots[0]}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#1B5E20] flex items-center justify-center flex-shrink-0">
+                          <Users className="w-5 h-5 text-[#00E676]" />
+                        </div>
+                        <div>
+                          <p className="text-[#BDBDBD] text-xs sm:text-sm">Players</p>
+                          <p className="text-white font-semibold text-sm sm:text-base">
+                            {selectedMatch.joinedPlayers}/{selectedMatch.totalPlayers}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#1B5E20] flex items-center justify-center flex-shrink-0">
+                          <span className="text-[#00E676] font-bold text-lg">₹</span>
+                        </div>
+                        <div>
+                          <p className="text-[#BDBDBD] text-xs sm:text-sm">Contribution</p>
+                          <p className="text-[#00E676] font-bold text-sm sm:text-base">
+                            ₹{selectedMatch.contributionPerPlayer}/player
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Creator Info */}
+                  <div className="bg-[#121212] rounded-xl p-4 sm:p-5 border border-[#1B5E20]">
+                    <h3 className="text-white font-bold mb-3 text-base sm:text-lg">Match Creator</h3>
+                    <div className="flex items-center gap-3 bg-[#1E1E1E] rounded-lg p-3 border border-[#00E676]/30">
+                      <div className="w-12 h-12 rounded-full bg-[#1B5E20] flex items-center justify-center flex-shrink-0">
+                        <UserCheck className="w-6 h-6 text-[#00E676]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-semibold text-sm sm:text-base">{selectedMatch.creatorName}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Phone className="w-3 h-3 text-[#00E676] flex-shrink-0" />
+                          <p className="text-[#BDBDBD] text-xs sm:text-sm truncate">{selectedMatch.creatorPhone}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Players List */}
+                  <div className="bg-[#121212] rounded-xl p-4 sm:p-5 border border-[#1B5E20]">
+                    <div className="flex items-center justify-between mb-3 sm:mb-4">
+                      <h3 className="text-white font-bold text-base sm:text-lg">Joined Players</h3>
+                      <Badge className="bg-[#1B5E20] text-[#00E676] text-xs">
+                        {selectedMatch.players?.length || 0} Players
+                      </Badge>
+                    </div>
+                    
+                    {selectedMatch.players && selectedMatch.players.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                        {selectedMatch.players.map((player: any, index: number) => (
+                          <div
+                            key={index}
+                            className="bg-[#1E1E1E] rounded-lg p-3 border border-[#1B5E20] hover:border-[#00E676]/50 transition-all"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-[#1B5E20] flex items-center justify-center flex-shrink-0 text-[#00E676] font-bold text-xs">
+                                {index + 1}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-medium text-xs sm:text-sm">{player.name}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <Phone className="w-3 h-3 text-[#00E676] flex-shrink-0" />
+                                  <p className="text-[#BDBDBD] text-xs truncate">{player.phone}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[#BDBDBD] text-center py-4 text-sm">No players joined yet</p>
+                    )}
+
+                    {selectedMatch.requiredPlayers > selectedMatch.joinedPlayers && (
+                      <div className="mt-4 p-3 bg-[#1B5E20]/20 rounded-lg border border-[#1B5E20]">
+                        <p className="text-[#00E676] text-center text-xs sm:text-sm font-semibold">
+                          {selectedMatch.requiredPlayers - selectedMatch.joinedPlayers} more{" "}
+                          {selectedMatch.requiredPlayers - selectedMatch.joinedPlayers === 1 ? "player" : "players"} needed
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-3">
+                  <Button
+                    onClick={() => setShowDetailsDialog(false)}
+                    variant="outline"
+                    className="border-[#1B5E20] text-white hover:border-[#00E676] w-full sm:w-auto order-2 sm:order-1 text-[#000000]"
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => handleJoinMatch(selectedMatch.id)}
+                    className="bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover w-full sm:w-auto order-1 sm:order-2"
+                  >
+                    <UserCheck className="w-4 h-4 mr-2" />
+                    Join This Match
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

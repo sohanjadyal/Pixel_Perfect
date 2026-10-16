@@ -53,6 +53,24 @@ export function FeaturedCarousel({ turfs }: FeaturedCarouselProps) {
 
       {/* Content */}
       <div className="relative h-full flex items-center px-8 md:px-16">
+        {/* Prev button */}
+        <button
+          onClick={goToPrevious}
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 border border-[#00E676]/50 text-[#00E676] hover:bg-[#00E676]/20 hover:border-[#00E676] transition-all backdrop-blur-sm shadow-[0_0_12px_rgba(0,230,118,0.2)]"
+          aria-label="Previous"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        {/* Next button */}
+        <button
+          onClick={goToNext}
+          className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 border border-[#00E676]/50 text-[#00E676] hover:bg-[#00E676]/20 hover:border-[#00E676] transition-all backdrop-blur-sm shadow-[0_0_12px_rgba(0,230,118,0.2)]"
+          aria-label="Next"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+
         <div className="max-w-2xl">
           <div className="inline-block mb-4">
             <span className="bg-[#00E676] text-[#121212] px-4 py-2 rounded-full font-bold text-sm neon-glow">
@@ -96,24 +114,6 @@ export function FeaturedCarousel({ turfs }: FeaturedCarouselProps) {
         </div>
       </div>
 
-      {/* Navigation Buttons */}
-      <Button
-        onClick={goToPrevious}
-        variant="ghost"
-        size="icon"
-        className="absolute left-4 top-1/2 -translate-y-1/2 bg-[#1E1E1E]/80 hover:bg-[#1E1E1E] text-white opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <ChevronLeft className="h-6 w-6" />
-      </Button>
-
-      <Button
-        onClick={goToNext}
-        variant="ghost"
-        size="icon"
-        className="absolute right-4 top-1/2 -translate-y-1/2 bg-[#1E1E1E]/80 hover:bg-[#1E1E1E] text-white opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <ChevronRight className="h-6 w-6" />
-      </Button>
 
       {/* Indicators */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">

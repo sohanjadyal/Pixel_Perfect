@@ -23,7 +23,7 @@ export function Profile() {
   });
 
   useEffect(() => {
-    const user = localStorage.getItem("turfbook_user");
+    const user = localStorage.getItem("turfbook_auth");
     if (user) {
       const parsed = JSON.parse(user);
       setUserData({
@@ -38,12 +38,12 @@ export function Profile() {
   }, [navigate]);
 
   const handleSave = () => {
-    localStorage.setItem("turfbook_user", JSON.stringify(userData));
+    localStorage.setItem("turfbook_auth", JSON.stringify(userData));
     setIsEditing(false);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("turfbook_user");
+    localStorage.removeItem("turfbook_auth");
     navigate("/home");
   };
 

@@ -1,5 +1,4 @@
 import { createBrowserRouter } from "react-router";
-import { SplashIntro } from "./pages/SplashIntro";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
@@ -8,12 +7,14 @@ import { Profile } from "./pages/Profile";
 import { TurfOwnerDashboard } from "./pages/TurfOwnerDashboard";
 import { OwnerLogin } from "./pages/OwnerLogin";
 import { OwnerSignup } from "./pages/OwnerSignup";
+import { AdminLogin } from "./pages/AdminLogin";
+import { AdminDashboard } from "./pages/AdminDashboard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: SplashIntro,
+    Component: Home,
     ErrorBoundary,
   },
   {
@@ -23,7 +24,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/animation",
-    Component: SplashIntro,
+    Component: Home,
     ErrorBoundary,
   },
   {
@@ -69,6 +70,16 @@ export const router = createBrowserRouter([
   {
     path: "/owner/dashboard",
     Component: TurfOwnerDashboard,
+    ErrorBoundary,
+  },
+  {
+    path: "/admin",
+    Component: AdminLogin,
+    ErrorBoundary,
+  },
+  {
+    path: "/admin/dashboard",
+    Component: AdminDashboard,
     ErrorBoundary,
   },
   {

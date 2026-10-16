@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Clock, MapPin, Phone, X } from "lucide-react";
+import { Calendar, Clock, MapPin, Phone, X, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import {
@@ -13,39 +13,40 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
+import { NotificationContainer, NotificationProps } from "./NotificationToast";
 
 const mockBookings = [
   {
     id: 1,
-    turfName: "Green Valley Sports Arena",
+    turfName: "Sportobuddy Sports Arena",
     turfImage: "https://images.unsplash.com/photo-1459865264687-595d652de67e?w=800",
-    location: "Koramangala, Bangalore",
+    location: "Andheri West, Mumbai",
     date: "2026-02-15",
     timeSlots: ["10:00 AM - 11:00 AM", "11:00 AM - 12:00 PM"],
     players: 12,
     totalAmount: 3000,
     paymentStatus: "Paid",
-    status: "Booked",
+    status: "Confirmed",
     bookingRef: "TRF-001-240215",
   },
   {
     id: 2,
-    turfName: "Champions Cricket Ground",
+    turfName: "Lucky Sports Hub",
     turfImage: "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=800",
-    location: "Indiranagar, Bangalore",
+    location: "Chandivali, Andheri East, Mumbai",
     date: "2026-02-16",
     timeSlots: ["6:00 PM - 7:00 PM"],
     players: 22,
     totalAmount: 2000,
-    paymentStatus: "Pending",
+    paymentStatus: "Paid",
     status: "Pending",
     bookingRef: "TRF-002-240216",
   },
   {
     id: 3,
-    turfName: "Elite Football Turf",
+    turfName: "Prime Turf",
     turfImage: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800",
-    location: "HSR Layout, Bangalore",
+    location: "Marol, Andheri East, Mumbai",
     date: "2026-02-10",
     timeSlots: ["4:00 PM - 5:00 PM"],
     players: 10,
@@ -56,40 +57,74 @@ const mockBookings = [
   },
   {
     id: 4,
-    turfName: "Victory Multi-Sport Complex",
+    turfName: "Score",
     turfImage: "https://images.unsplash.com/photo-1551958219-acbc608c6377?w=800",
-    location: "Whitefield, Bangalore",
+    location: "Marwah House, Marol, Andheri East, Mumbai",
     date: "2026-02-12",
     timeSlots: ["3:00 PM - 4:00 PM"],
     players: 16,
     totalAmount: 1800,
     paymentStatus: "Refunded",
-    status: "Cancelled",
+    status: "Rejected",
+    rejectionReason: "Turf maintenance scheduled for that day",
     bookingRef: "TRF-004-240212",
   },
 ];
 
 export function MyBookings() {
+  const [allBookings, setAllBookings] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("turfbook_user_bookings") || "[]");
+      return [...stored, ...mockBookings];
+    } catch {
+      return mockBookings;
+    }
+  });
   const [filter, setFilter] = useState("all");
+  const [notifications, setNotifications] = useState<NotificationProps[]>([]);
 
-  const filteredBookings = mockBookings.filter((booking) => {
+  const addNotification = (
+    type: "success" | "error" | "warning" | "info",
+    title: string,
+    message: string
+  ) => {
+    const id = Date.now().toString();
+    setNotifications((prev) => [...prev, { id, type, title, message, onClose: removeNotification }]);
+  };
+
+  const removeNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((notif) => notif.id !== id));
+  };
+
+  const filteredBookings = allBookings.filter((booking) => {
     if (filter === "all") return true;
     return booking.status.toLowerCase() === filter.toLowerCase();
   });
 
-  const handleCancelBooking = (bookingId: number) => {
-    console.log("Cancelling booking:", bookingId);
-    // Handle cancellation logic
+  const handleCancelBooking = (bookingId: number | string) => {
+    setAllBookings((prev) =>
+      prev.map((b) => (String(b.id) === String(bookingId) ? { ...b, status: "Cancelled" } : b))
+    );
+    try {
+      const stored = JSON.parse(localStorage.getItem("turfbook_user_bookings") || "[]");
+      const updated = stored.map((b: any) =>
+        String(b.id) === String(bookingId) ? { ...b, status: "Cancelled" } : b
+      );
+      localStorage.setItem("turfbook_user_bookings", JSON.stringify(updated));
+    } catch {}
+    addNotification("success", "Booking Cancelled", "Your booking has been cancelled successfully.");
   };
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case "booked":
+      case "confirmed":
         return "bg-[#00E676]/20 text-[#00E676] border-[#00E676]";
       case "pending":
         return "bg-yellow-500/20 text-yellow-500 border-yellow-500";
       case "played":
         return "bg-blue-500/20 text-blue-500 border-blue-500";
+      case "rejected":
+        return "bg-red-500/20 text-red-500 border-red-500";
       case "cancelled":
         return "bg-red-500/20 text-red-500 border-red-500";
       default:
@@ -113,15 +148,20 @@ export function MyBookings() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
+        {/* Notification Container */}
+        <NotificationContainer notifications={notifications} onClose={removeNotification} />
+
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">My Bookings</h1>
-          <p className="text-[#BDBDBD]">Track and manage all your turf bookings</p>
+          <div className="mb-4">
+            <h1 className="text-3xl font-bold text-white mb-2">My Bookings</h1>
+            <p className="text-[#BDBDBD]">Track and manage all your turf bookings</p>
+          </div>
         </div>
 
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          {["all", "booked", "pending", "played", "cancelled"].map((status) => (
+          {["all", "confirmed", "pending", "played", "rejected", "cancelled"].map((status) => (
             <Button
               key={status}
               onClick={() => setFilter(status)}
@@ -203,6 +243,32 @@ export function MyBookings() {
                     </div>
                   </div>
 
+                  {/* Rejection Reason */}
+                  {booking.status === "Rejected" && booking.rejectionReason && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                      <div className="flex items-start gap-2">
+                        <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-red-500 text-xs font-semibold mb-1">Rejection Reason</p>
+                          <p className="text-[#BDBDBD] text-xs">{booking.rejectionReason}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pending Owner Approval Notice */}
+                  {booking.status === "Pending" && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-yellow-500 text-xs font-semibold mb-1">Awaiting Confirmation</p>
+                          <p className="text-[#BDBDBD] text-xs">Your booking is pending owner approval. You'll be notified once confirmed.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between pt-3 border-t border-[#1B5E20]">
                     <div>
                       <p className="text-[#BDBDBD] text-xs">Booking Ref</p>
@@ -225,7 +291,7 @@ export function MyBookings() {
                       </p>
                     </div>
 
-                    {(booking.status === "Pending" || booking.status === "Booked") && (
+                    {(booking.status === "Pending" || booking.status === "Confirmed") && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button

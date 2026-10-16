@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import logoImg from "@/imports/a380a0_a6c11f05aa88455bb9879051dc494231_mv2-removebg-preview.png";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
@@ -61,14 +62,12 @@ export function SplashIntro() {
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 text-center"
       >
-        <h1 className="text-7xl md:text-9xl font-black tracking-tighter">
-          <span className="text-[#00E676] drop-shadow-[0_0_30px_rgba(0,230,118,0.8)]">
-            Turf
-          </span>
-          <span className="text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]">
-            Book
-          </span>
-        </h1>
+        <img
+          src={logoImg}
+          alt="TurfBook"
+          className="h-28 md:h-40 w-auto mx-auto"
+          style={{ filter: "drop-shadow(0 0 30px rgba(0,230,118,0.5))" }}
+        />
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

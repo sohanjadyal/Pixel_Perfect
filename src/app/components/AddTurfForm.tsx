@@ -1,364 +1,383 @@
 import { useState } from "react";
-import { Upload, MapPin, Check, X, Plus } from "lucide-react";
-import { Button } from "./ui/button";
+import { Upload, X, Check, ChevronRight, ChevronLeft, MapPin, IndianRupee, Users, Image as ImageIcon, QrCode } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { Checkbox } from "./ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
+import { useTurfs } from "../context/TurfContext";
 
-const sportTypes = ["Cricket", "Football", "Badminton", "Pickleball", "Basketball", "Tennis", "Volleyball"];
-const amenitiesList = ["Parking", "Washroom", "Cafeteria", "WiFi", "Changing Room", "First Aid", "Water", "Lights"];
+const SPORTS = ["Cricket", "Football", "Badminton", "Pickleball", "Basketball", "Tennis", "Volleyball"];
+const AMENITIES = ["Parking", "Washroom", "Cafeteria", "WiFi", "Changing Room", "First Aid", "Water", "Lights"];
+
+const STEPS = [
+  { id: 1, label: "Basic Info", icon: MapPin },
+  { id: 2, label: "Sports & Amenities", icon: Users },
+  { id: 3, label: "Pricing", icon: IndianRupee },
+  { id: 4, label: "Photos & QR", icon: ImageIcon },
+];
 
 export function AddTurfForm() {
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const { addTurf } = useTurfs();
+  const [step, setStep] = useState(1);
+  const [done, setDone] = useState(false);
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [turfImages, setTurfImages] = useState<string[]>([]);
-  const [qrImage, setQrImage] = useState<string>("");
+  const [qrImage, setQrImage] = useState("");
+  const [covered, setCovered] = useState<"covered" | "uncovered">("covered");
+  const [formData, setFormData] = useState({ name: "", location: "", price: "", maxPlayers: "", description: "" });
 
-  const [formData, setFormData] = useState({
-    name: "",
-    location: "",
-    covered: "covered",
-    price: "",
-    maxPlayers: "",
-    description: "",
-  });
+  const update = (key: string, val: string) => setFormData((p) => ({ ...p, [key]: val }));
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitted(true);
+  const toggleSport = (s: string) => setSelectedSports((p) => p.includes(s) ? p.filter((x) => x !== s) : [...p, s]);
+  const toggleAmenity = (a: string) => setSelectedAmenities((p) => p.includes(a) ? p.filter((x) => x !== a) : [...p, a]);
+
+  const handleImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) setTurfImages((p) => [...p, ...Array.from(files).map((f) => URL.createObjectURL(f))]);
+  };
+
+  const handleQR = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) setQrImage(URL.createObjectURL(f));
+  };
+
+  const handleSubmit = () => {
+    addTurf({
+      name: formData.name,
+      location: formData.location,
+      price: Number(formData.price),
+      sports: selectedSports,
+      covered: covered === "covered",
+      amenities: selectedAmenities,
+      description: formData.description,
+      maxPlayers: Number(formData.maxPlayers),
+      qrCode: qrImage,
+      image: turfImages[0] || "https://images.unsplash.com/photo-1459865264687-595d652de67e?w=800",
+    });
+    setDone(true);
     setTimeout(() => {
-      setIsSubmitted(false);
-      setFormData({
-        name: "",
-        location: "",
-        covered: "covered",
-        price: "",
-        maxPlayers: "",
-        description: "",
-      });
+      setDone(false);
+      setStep(1);
+      setFormData({ name: "", location: "", price: "", maxPlayers: "", description: "" });
       setSelectedSports([]);
       setSelectedAmenities([]);
       setTurfImages([]);
       setQrImage("");
-    }, 3000);
+    }, 3500);
   };
 
-  const toggleSport = (sport: string) => {
-    setSelectedSports((prev) =>
-      prev.includes(sport) ? prev.filter((s) => s !== sport) : [...prev, sport]
-    );
+  const canNext = () => {
+    if (step === 1) return formData.name && formData.location;
+    if (step === 2) return selectedSports.length > 0;
+    if (step === 3) return formData.price && formData.maxPlayers;
+    return true;
   };
 
-  const toggleAmenity = (amenity: string) => {
-    setSelectedAmenities((prev) =>
-      prev.includes(amenity) ? prev.filter((a) => a !== amenity) : [...prev, amenity]
-    );
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      // Mock image URLs - in real app would upload to server
-      const newImages = Array.from(files).map((file) =>
-        URL.createObjectURL(file)
-      );
-      setTurfImages((prev) => [...prev, ...newImages]);
-    }
-  };
-
-  const handleQRUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setQrImage(URL.createObjectURL(file));
-    }
-  };
-
-  if (isSubmitted) {
+  if (done) {
     return (
-      <div className="max-w-4xl">
-        <div className="bg-[#1E1E1E] rounded-[14px] p-12 border border-[#1B5E20] text-center card-elevation">
-          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-[#00E676] flex items-center justify-center neon-glow">
-            <Check className="w-12 h-12 text-[#121212]" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center max-w-sm"
+        >
+          <div className="w-20 h-20 rounded-full bg-[#00E676] flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(0,230,118,0.5)]">
+            <Check className="w-10 h-10 text-[#121212]" strokeWidth={3} />
           </div>
-          <h3 className="text-3xl font-bold text-white mb-3">Turf Added Successfully!</h3>
-          <p className="text-[#BDBDBD]">
-            Your turf has been added and is now live on the platform.
-          </p>
-        </div>
+          <h3 className="text-2xl font-bold text-white mb-2">Turf Listed!</h3>
+          <p className="text-[#757575]">Your turf is now live and visible to players for booking.</p>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-white mb-2">Add New Turf</h2>
-        <p className="text-[#BDBDBD]">Fill in the details to add a new turf to your portfolio</p>
+    <div className="max-w-2xl space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-3xl font-bold text-white">Add New Turf</h2>
+        <p className="text-[#757575] mt-1">Fill in the details to list your turf on TurfBook</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Information */}
-        <div className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation">
-          <h3 className="text-white font-semibold text-lg mb-4">Basic Information</h3>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-white">Turf Name *</Label>
-              <Input
-                id="name"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Green Valley Sports Arena"
-                className="bg-[#121212] border-[#1B5E20] text-white placeholder:text-[#BDBDBD]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="location" className="text-white">Location *</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#00E676]" />
-                <Input
-                  id="location"
-                  required
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="e.g., Koramangala, Bangalore"
-                  className="pl-10 bg-[#121212] border-[#1B5E20] text-white placeholder:text-[#BDBDBD]"
-                />
+      {/* Step indicator */}
+      <div className="flex items-center gap-2">
+        {STEPS.map((s, i) => {
+          const Icon = s.icon;
+          const active = step === s.id;
+          const done = step > s.id;
+          return (
+            <div key={s.id} className="flex items-center gap-2 flex-1">
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${
+                active ? "bg-[#00E676] text-[#121212]" : done ? "bg-[#1B5E20]/40 text-[#00E676]" : "bg-[#1E1E1E] text-[#424242]"
+              }`}>
+                {done ? <Check className="w-4 h-4 flex-shrink-0" /> : <Icon className="w-4 h-4 flex-shrink-0" />}
+                <span className="text-xs font-semibold hidden sm:block">{s.label}</span>
               </div>
-              <p className="text-[#BDBDBD] text-xs">
-                Click the map icon to select location (Map Picker - Coming Soon)
-              </p>
+              {i < STEPS.length - 1 && (
+                <div className={`h-0.5 flex-1 rounded-full transition-all ${done ? "bg-[#00E676]/50" : "bg-[#1E1E1E]"}`} />
+              )}
             </div>
+          );
+        })}
+      </div>
 
-            <div className="space-y-2">
-              <Label className="text-white">Description</Label>
-              <Textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe your turf facilities..."
-                className="bg-[#121212] border-[#1B5E20] text-white placeholder:text-[#BDBDBD] min-h-[100px]"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Turf Type */}
-        <div className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation">
-          <h3 className="text-white font-semibold text-lg mb-4">Turf Type *</h3>
-          
-          <div className="space-y-4">
-            <div>
-              <Label className="text-white mb-3 block">Select Sports (Multiple)</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {sportTypes.map((sport) => (
-                  <button
-                    key={sport}
-                    type="button"
-                    onClick={() => toggleSport(sport)}
-                    className={`px-4 py-3 rounded-lg border-2 transition-all ${
-                      selectedSports.includes(sport)
-                        ? "bg-[#00E676] text-[#121212] border-[#00E676] neon-glow"
-                        : "bg-[#121212] text-white border-[#1B5E20] hover:border-[#00E676]"
-                    }`}
-                  >
-                    {sport}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-white mb-3 block">Covered / Uncovered *</Label>
-              <RadioGroup
-                value={formData.covered}
-                onValueChange={(value) => setFormData({ ...formData, covered: value })}
-              >
-                <div className="flex gap-4">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="covered" id="covered" className="border-[#1B5E20]" />
-                    <Label htmlFor="covered" className="text-white cursor-pointer">
-                      Covered
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="uncovered" id="uncovered" className="border-[#1B5E20]" />
-                    <Label htmlFor="uncovered" className="text-white cursor-pointer">
-                      Uncovered
-                    </Label>
-                  </div>
-                </div>
-              </RadioGroup>
-            </div>
-          </div>
-        </div>
-
-        {/* Pricing & Capacity */}
-        <div className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation">
-          <h3 className="text-white font-semibold text-lg mb-4">Pricing & Capacity</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="price" className="text-white">Price per Hour (₹) *</Label>
-              <Input
-                id="price"
-                type="number"
-                required
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                placeholder="e.g., 1500"
-                className="bg-[#121212] border-[#1B5E20] text-white placeholder:text-[#BDBDBD]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="maxPlayers" className="text-white">Max Players *</Label>
-              <Input
-                id="maxPlayers"
-                type="number"
-                required
-                value={formData.maxPlayers}
-                onChange={(e) => setFormData({ ...formData, maxPlayers: e.target.value })}
-                placeholder="e.g., 22"
-                className="bg-[#121212] border-[#1B5E20] text-white placeholder:text-[#BDBDBD]"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Amenities */}
-        <div className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation">
-          <h3 className="text-white font-semibold text-lg mb-4">Amenities</h3>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {amenitiesList.map((amenity) => (
-              <div key={amenity} className="flex items-center space-x-2">
-                <Checkbox
-                  id={amenity}
-                  checked={selectedAmenities.includes(amenity)}
-                  onCheckedChange={() => toggleAmenity(amenity)}
-                  className="border-[#1B5E20]"
-                />
-                <Label htmlFor={amenity} className="text-white cursor-pointer">
-                  {amenity}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Images */}
-        <div className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation">
-          <h3 className="text-white font-semibold text-lg mb-4">Turf Images *</h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="turf-images"
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-[#1B5E20] rounded-lg cursor-pointer hover:border-[#00E676] transition-all"
-              >
-                <Upload className="w-8 h-8 text-[#00E676] mb-2" />
-                <span className="text-white text-sm">Click to upload turf images</span>
-                <span className="text-[#BDBDBD] text-xs">PNG, JPG up to 10MB</span>
-              </label>
-              <input
-                id="turf-images"
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-            </div>
-
-            {turfImages.length > 0 && (
-              <div className="grid grid-cols-3 gap-4">
-                {turfImages.map((img, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={img}
-                      alt={`Turf ${index + 1}`}
-                      className="w-full h-24 object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setTurfImages(turfImages.filter((_, i) => i !== index))}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Payment QR */}
-        <div className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation">
-          <h3 className="text-white font-semibold text-lg mb-4">Payment QR Code *</h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="qr-code"
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-[#1B5E20] rounded-lg cursor-pointer hover:border-[#00E676] transition-all"
-              >
-                <Upload className="w-8 h-8 text-[#00E676] mb-2" />
-                <span className="text-white text-sm">Upload Payment QR Code</span>
-                <span className="text-[#BDBDBD] text-xs">This will be shown to players for payment</span>
-              </label>
-              <input
-                id="qr-code"
-                type="file"
-                accept="image/*"
-                onChange={handleQRUpload}
-                className="hidden"
-              />
-            </div>
-
-            {qrImage && (
-              <div className="flex justify-center">
-                <div className="relative group">
-                  <img
-                    src={qrImage}
-                    alt="Payment QR"
-                    className="w-48 h-48 object-contain rounded-lg bg-white p-2"
+      {/* Step content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={step}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.25 }}
+          className="bg-[#1E1E1E] border border-[#1B5E20] rounded-2xl p-6 space-y-5"
+        >
+          {/* Step 1 – Basic Info */}
+          {step === 1 && (
+            <>
+              <h3 className="text-white font-semibold text-lg">Basic Information</h3>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[#BDBDBD] text-sm">Turf Name *</Label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => update("name", e.target.value)}
+                    placeholder="e.g., Sportobuddy Sports Arena"
+                    className="bg-[#121212] border-[#2a2a2a] text-white placeholder:text-[#424242] focus:border-[#00E676] h-11 rounded-xl"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setQrImage("")}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[#BDBDBD] text-sm">Location *</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#424242]" />
+                    <Input
+                      value={formData.location}
+                      onChange={(e) => update("location", e.target.value)}
+                      placeholder="e.g., Andheri West, Mumbai"
+                      className="pl-10 bg-[#121212] border-[#2a2a2a] text-white placeholder:text-[#424242] focus:border-[#00E676] h-11 rounded-xl"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[#BDBDBD] text-sm">Description</Label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) => update("description", e.target.value)}
+                    placeholder="Describe your turf — surface type, lighting, nearby landmarks..."
+                    rows={3}
+                    className="bg-[#121212] border-[#2a2a2a] text-white placeholder:text-[#424242] focus:border-[#00E676] rounded-xl resize-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[#BDBDBD] text-sm">Type</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["covered", "uncovered"] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setCovered(type)}
+                        className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all capitalize ${
+                          covered === type
+                            ? "border-[#00E676] bg-[#00E676]/10 text-[#00E676]"
+                            : "border-[#2a2a2a] text-[#757575] hover:border-[#1B5E20]"
+                        }`}
+                      >
+                        {type === "covered" ? "🏛️ Covered" : "☀️ Open Air"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+            </>
+          )}
 
-        {/* Submit Button */}
-        <div className="flex gap-4">
-          <Button
-            type="submit"
-            className="flex-1 bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover font-semibold py-6 text-lg"
+          {/* Step 2 – Sports & Amenities */}
+          {step === 2 && (
+            <>
+              <h3 className="text-white font-semibold text-lg">Sports & Amenities</h3>
+              <div className="space-y-5">
+                <div>
+                  <Label className="text-[#BDBDBD] text-sm mb-3 block">Sports Available *</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {SPORTS.map((sport) => (
+                      <button
+                        key={sport}
+                        type="button"
+                        onClick={() => toggleSport(sport)}
+                        className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
+                          selectedSports.includes(sport)
+                            ? "bg-[#00E676] border-[#00E676] text-[#121212]"
+                            : "bg-[#121212] border-[#2a2a2a] text-[#757575] hover:border-[#1B5E20] hover:text-white"
+                        }`}
+                      >
+                        {sport}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedSports.length === 0 && (
+                    <p className="text-[#757575] text-xs mt-2">Select at least one sport</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-[#BDBDBD] text-sm mb-3 block">Amenities</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {AMENITIES.map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => toggleAmenity(a)}
+                        className={`px-3 py-2.5 rounded-xl border text-sm font-medium transition-all text-left ${
+                          selectedAmenities.includes(a)
+                            ? "bg-[#1B5E20]/30 border-[#00E676]/50 text-[#00E676]"
+                            : "bg-[#121212] border-[#2a2a2a] text-[#757575] hover:border-[#1B5E20]"
+                        }`}
+                      >
+                        {selectedAmenities.includes(a) && <span className="mr-1">✓</span>}{a}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Step 3 – Pricing */}
+          {step === 3 && (
+            <>
+              <h3 className="text-white font-semibold text-lg">Pricing & Capacity</h3>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[#BDBDBD] text-sm">Price per Hour (₹) *</Label>
+                  <div className="relative">
+                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#424242]" />
+                    <Input
+                      type="number"
+                      value={formData.price}
+                      onChange={(e) => update("price", e.target.value)}
+                      placeholder="1500"
+                      className="pl-10 bg-[#121212] border-[#2a2a2a] text-white placeholder:text-[#424242] focus:border-[#00E676] h-11 rounded-xl"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[#BDBDBD] text-sm">Max Players *</Label>
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#424242]" />
+                    <Input
+                      type="number"
+                      value={formData.maxPlayers}
+                      onChange={(e) => update("maxPlayers", e.target.value)}
+                      placeholder="22"
+                      className="pl-10 bg-[#121212] border-[#2a2a2a] text-white placeholder:text-[#424242] focus:border-[#00E676] h-11 rounded-xl"
+                    />
+                  </div>
+                </div>
+                {formData.price && (
+                  <div className="bg-[#121212] border border-[#1B5E20] rounded-xl p-4 grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-[#00E676] font-bold text-lg">₹{formData.price}</p>
+                      <p className="text-[#757575] text-xs">Per Hour</p>
+                    </div>
+                    <div>
+                      <p className="text-[#00E676] font-bold text-lg">₹{Number(formData.price) * 6}</p>
+                      <p className="text-[#757575] text-xs">Per Day (6h)</p>
+                    </div>
+                    <div>
+                      <p className="text-[#00E676] font-bold text-lg">₹{Number(formData.price) * 30 * 6}</p>
+                      <p className="text-[#757575] text-xs">Monthly Est.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Step 4 – Photos & QR */}
+          {step === 4 && (
+            <>
+              <h3 className="text-white font-semibold text-lg">Photos & Payment QR</h3>
+              <div className="space-y-5">
+                {/* Turf images */}
+                <div>
+                  <Label className="text-[#BDBDBD] text-sm mb-2 block">Turf Photos</Label>
+                  <label
+                    htmlFor="turf-images"
+                    className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-[#2a2a2a] rounded-xl cursor-pointer hover:border-[#00E676] hover:bg-[#00E676]/5 transition-all"
+                  >
+                    <Upload className="w-6 h-6 text-[#424242] mb-1.5" />
+                    <p className="text-[#757575] text-sm">Click to upload photos</p>
+                    <p className="text-[#424242] text-xs">PNG, JPG up to 10MB</p>
+                    <input id="turf-images" type="file" multiple accept="image/*" onChange={handleImages} className="hidden" />
+                  </label>
+                  {turfImages.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 mt-3">
+                      {turfImages.map((img, idx) => (
+                        <div key={idx} className="relative group aspect-square">
+                          <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
+                          <button
+                            type="button"
+                            onClick={() => setTurfImages((p) => p.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* QR Code */}
+                <div>
+                  <Label className="text-[#BDBDBD] text-sm mb-2 block">Payment QR Code</Label>
+                  {qrImage ? (
+                    <div className="flex items-center gap-4 bg-[#121212] border border-[#1B5E20] rounded-xl p-4">
+                      <img src={qrImage} alt="QR" className="w-24 h-24 object-contain rounded-lg bg-white p-1" />
+                      <div>
+                        <p className="text-white text-sm font-medium">QR uploaded</p>
+                        <p className="text-[#757575] text-xs mb-2">Shown to players at payment step</p>
+                        <button onClick={() => setQrImage("")} className="text-red-400 text-xs hover:text-red-300">Remove</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label
+                      htmlFor="qr-upload"
+                      className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-[#2a2a2a] rounded-xl cursor-pointer hover:border-[#00E676] hover:bg-[#00E676]/5 transition-all"
+                    >
+                      <QrCode className="w-6 h-6 text-[#424242] mb-1.5" />
+                      <p className="text-[#757575] text-sm">Upload your PhonePe / UPI QR</p>
+                      <input id="qr-upload" type="file" accept="image/*" onChange={handleQR} className="hidden" />
+                    </label>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Navigation buttons */}
+      <div className="flex gap-3">
+        {step > 1 && (
+          <button
+            onClick={() => setStep((p) => p - 1)}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl border border-[#2a2a2a] text-[#BDBDBD] hover:border-[#1B5E20] hover:text-white text-sm font-semibold transition-all"
           >
-            Add Turf
-          </Button>
-        </div>
-      </form>
+            <ChevronLeft className="w-4 h-4" /> Back
+          </button>
+        )}
+        <button
+          onClick={() => step < 4 ? setStep((p) => p + 1) : handleSubmit()}
+          disabled={!canNext()}
+          className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#00E676] text-[#121212] font-bold text-sm hover:bg-[#00E676]/90 shadow-[0_0_20px_rgba(0,230,118,0.25)] hover:shadow-[0_0_32px_rgba(0,230,118,0.4)] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        >
+          {step === 4 ? (
+            <><Check className="w-4 h-4" /> Submit Turf</>
+          ) : (
+            <>Continue <ChevronRight className="w-4 h-4" /></>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

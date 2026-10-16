@@ -1,58 +1,93 @@
 import { useState } from "react";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
-export function FilterSidebar() {
-  const [sortBy, setSortBy] = useState("distance");
+export interface FilterState {
+  sortBy: string;
+  offers: boolean;
+  covered: boolean;
+  uncovered: boolean;
+  open24x7: boolean;
+  availableOnly: boolean;
+  sports: string[];
+  amenities: string[];
+}
+
+interface FilterSidebarProps {
+  filters: FilterState;
+  onApply: (filters: FilterState) => void;
+}
+
+const SPORTS = ["Cricket", "Football", "Badminton", "Pickleball", "Basketball"];
+const AMENITIES = ["Parking", "Washroom", "Cafeteria", "Changing Room", "First Aid"];
+
+const DEFAULT_FILTERS: FilterState = {
+  sortBy: "distance",
+  offers: false,
+  covered: false,
+  uncovered: false,
+  open24x7: false,
+  availableOnly: false,
+  sports: [],
+  amenities: [],
+};
+
+export function FilterSidebar({ filters, onApply }: FilterSidebarProps) {
+  const [draft, setDraft] = useState<FilterState>(filters);
   const [showAdvanced, setShowAdvanced] = useState(true);
-  
-  const [filters, setFilters] = useState({
-    offers: false,
-    covered: false,
-    uncovered: false,
-    open24x7: false,
-    availableOnly: false,
-  });
-
-  const [selectedSports, setSelectedSports] = useState<string[]>([]);
-  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-
-  const sports = ["Cricket", "Football", "Badminton", "Pickleball", "Basketball"];
-  const amenities = ["Parking", "Washroom", "Cafeteria", "Changing Room", "First Aid"];
 
   const toggleSport = (sport: string) => {
-    setSelectedSports(prev =>
-      prev.includes(sport) ? prev.filter(s => s !== sport) : [...prev, sport]
-    );
+    setDraft((prev) => ({
+      ...prev,
+      sports: prev.sports.includes(sport)
+        ? prev.sports.filter((s) => s !== sport)
+        : [...prev.sports, sport],
+    }));
   };
 
   const toggleAmenity = (amenity: string) => {
-    setSelectedAmenities(prev =>
-      prev.includes(amenity) ? prev.filter(a => a !== amenity) : [...prev, amenity]
-    );
+    setDraft((prev) => ({
+      ...prev,
+      amenities: prev.amenities.includes(amenity)
+        ? prev.amenities.filter((a) => a !== amenity)
+        : [...prev.amenities, amenity],
+    }));
   };
 
   const handleReset = () => {
-    setSortBy("distance");
-    setFilters({
-      offers: false,
-      covered: false,
-      uncovered: false,
-      open24x7: false,
-      availableOnly: false,
-    });
-    setSelectedSports([]);
-    setSelectedAmenities([]);
+    setDraft(DEFAULT_FILTERS);
+    onApply(DEFAULT_FILTERS);
   };
+
+  const handleApply = () => {
+    onApply(draft);
+  };
+
+  const activeCount = [
+    draft.offers,
+    draft.covered,
+    draft.uncovered,
+    draft.open24x7,
+    draft.availableOnly,
+    draft.sports.length > 0,
+    draft.amenities.length > 0,
+    draft.sortBy !== "distance",
+  ].filter(Boolean).length;
 
   return (
     <div className="bg-[#1E1E1E] rounded-[14px] p-6 card-elevation sticky top-24">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-white">Filters</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-xl font-bold text-white">Filters</h3>
+          {activeCount > 0 && (
+            <span className="bg-[#00E676] text-[#121212] text-xs font-bold px-2 py-0.5 rounded-full">
+              {activeCount}
+            </span>
+          )}
+        </div>
         <Button
           onClick={handleReset}
           variant="ghost"
@@ -66,34 +101,26 @@ export function FilterSidebar() {
       {/* Sorting */}
       <div className="mb-6">
         <Label className="text-white font-semibold mb-3 block">Sort By</Label>
-        <RadioGroup value={sortBy} onValueChange={setSortBy}>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="distance" id="distance" className="border-[#1B5E20]" />
-              <Label htmlFor="distance" className="text-[#BDBDBD] cursor-pointer">
-                Distance (Nearest First)
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="price-high" id="price-high" className="border-[#1B5E20]" />
-              <Label htmlFor="price-high" className="text-[#BDBDBD] cursor-pointer">
-                Price: High to Low
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="price-low" id="price-low" className="border-[#1B5E20]" />
-              <Label htmlFor="price-low" className="text-[#BDBDBD] cursor-pointer">
-                Price: Low to High
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="rating" id="rating" className="border-[#1B5E20]" />
-              <Label htmlFor="rating" className="text-[#BDBDBD] cursor-pointer">
-                Rating (Highest First)
-              </Label>
-            </div>
-          </div>
-        </RadioGroup>
+        <div className="space-y-2">
+          {[
+            { value: "distance", label: "Distance (Nearest First)" },
+            { value: "price-high", label: "Price: High to Low" },
+            { value: "price-low", label: "Price: Low to High" },
+            { value: "rating", label: "Rating (Highest First)" },
+          ].map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setDraft((p) => ({ ...p, sortBy: value }))}
+              className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm transition-all ${
+                draft.sortBy === value
+                  ? "bg-[#00E676]/15 border-[#00E676] text-[#00E676] font-semibold"
+                  : "border-[#1B5E20] text-[#BDBDBD] hover:border-[#00E676]/50 hover:text-white"
+              }`}
+            >
+              {draft.sortBy === value && <span className="mr-2">✓</span>}{label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Separator className="my-6 bg-[#1B5E20]" />
@@ -116,95 +143,42 @@ export function FilterSidebar() {
           <div className="space-y-4">
             {/* Quick Filters */}
             <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="offers"
-                  checked={filters.offers}
-                  onCheckedChange={(checked) =>
-                    setFilters({ ...filters, offers: checked as boolean })
-                  }
-                  className="border-[#1B5E20]"
-                />
-                <Label htmlFor="offers" className="text-[#BDBDBD] cursor-pointer">
-                  Offers Available
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="covered"
-                  checked={filters.covered}
-                  onCheckedChange={(checked) =>
-                    setFilters({ ...filters, covered: checked as boolean })
-                  }
-                  className="border-[#1B5E20]"
-                />
-                <Label htmlFor="covered" className="text-[#BDBDBD] cursor-pointer">
-                  Covered
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="uncovered"
-                  checked={filters.uncovered}
-                  onCheckedChange={(checked) =>
-                    setFilters({ ...filters, uncovered: checked as boolean })
-                  }
-                  className="border-[#1B5E20]"
-                />
-                <Label htmlFor="uncovered" className="text-[#BDBDBD] cursor-pointer">
-                  Uncovered
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="24x7"
-                  checked={filters.open24x7}
-                  onCheckedChange={(checked) =>
-                    setFilters({ ...filters, open24x7: checked as boolean })
-                  }
-                  className="border-[#1B5E20]"
-                />
-                <Label htmlFor="24x7" className="text-[#BDBDBD] cursor-pointer">
-                  24/7 Open
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="available"
-                  checked={filters.availableOnly}
-                  onCheckedChange={(checked) =>
-                    setFilters({ ...filters, availableOnly: checked as boolean })
-                  }
-                  className="border-[#1B5E20]"
-                />
-                <Label htmlFor="available" className="text-[#BDBDBD] cursor-pointer">
-                  Available Turf Only
-                </Label>
-              </div>
+              {[
+                { id: "offers", label: "Offers Available", key: "offers" as const },
+                { id: "covered", label: "Covered", key: "covered" as const },
+                { id: "uncovered", label: "Uncovered", key: "uncovered" as const },
+                { id: "24x7", label: "24/7 Open", key: "open24x7" as const },
+                { id: "available", label: "Available Turf Only", key: "availableOnly" as const },
+              ].map(({ id, label, key }) => (
+                <div key={id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={id}
+                    checked={draft[key]}
+                    onCheckedChange={(checked) =>
+                      setDraft((p) => ({ ...p, [key]: checked as boolean }))
+                    }
+                    className="border-[#1B5E20]"
+                  />
+                  <Label htmlFor={id} className="text-[#BDBDBD] cursor-pointer">{label}</Label>
+                </div>
+              ))}
             </div>
 
             <Separator className="my-4 bg-[#1B5E20]" />
 
-            {/* Sports Type */}
+            {/* Sports */}
             <div>
               <Label className="text-white font-semibold mb-3 block">Type of Sport</Label>
               <div className="space-y-2">
-                {sports.map((sport) => (
+                {SPORTS.map((sport) => (
                   <div key={sport} className="flex items-center space-x-2">
                     <Checkbox
                       id={`sport-${sport}`}
-                      checked={selectedSports.includes(sport)}
+                      checked={draft.sports.includes(sport)}
                       onCheckedChange={() => toggleSport(sport)}
                       className="border-[#1B5E20]"
                     />
-                    <Label
-                      htmlFor={`sport-${sport}`}
-                      className="text-[#BDBDBD] cursor-pointer"
-                    >
+                    <Label htmlFor={`sport-${sport}`} className="text-[#BDBDBD] cursor-pointer">
                       {sport}
                     </Label>
                   </div>
@@ -218,18 +192,15 @@ export function FilterSidebar() {
             <div>
               <Label className="text-white font-semibold mb-3 block">Amenities</Label>
               <div className="space-y-2">
-                {amenities.map((amenity) => (
+                {AMENITIES.map((amenity) => (
                   <div key={amenity} className="flex items-center space-x-2">
                     <Checkbox
                       id={`amenity-${amenity}`}
-                      checked={selectedAmenities.includes(amenity)}
+                      checked={draft.amenities.includes(amenity)}
                       onCheckedChange={() => toggleAmenity(amenity)}
                       className="border-[#1B5E20]"
                     />
-                    <Label
-                      htmlFor={`amenity-${amenity}`}
-                      className="text-[#BDBDBD] cursor-pointer"
-                    >
+                    <Label htmlFor={`amenity-${amenity}`} className="text-[#BDBDBD] cursor-pointer">
                       {amenity}
                     </Label>
                   </div>
@@ -242,9 +213,11 @@ export function FilterSidebar() {
 
       <Separator className="my-6 bg-[#1B5E20]" />
 
-      {/* Apply Button */}
-      <Button className="w-full bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover font-semibold">
-        Apply Filters
+      <Button
+        onClick={handleApply}
+        className="w-full bg-[#00E676] text-[#121212] hover:bg-[#00E676]/90 neon-glow-hover font-semibold"
+      >
+        Apply Filters {activeCount > 0 ? `(${activeCount})` : ""}
       </Button>
     </div>
   );
